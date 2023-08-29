@@ -55,7 +55,8 @@ jobs:
       - name: Install cross-compilation tools
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
         run: |
-          sudo apt-get update -yq \
+          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y \
+          && sudo apt-get -yq update \
           && sudo apt-get install gcc-4.8 g++-4.8 -yq \
           && sudo apt-get clean \
           && sudo rm -rf /var/lib/apt/lists/*
@@ -64,10 +65,15 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Prebuild package
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
         run: |
-          CC=gcc-4.8 \
-          CXX=g++-4.8 \
+          CC=x86_64-linux-gnu-g++-4.8 \
+          CXX=x86_64-linux-gnu-g++-4.8 \
           npx @mapbox/node-pre-gyp --target_arch=${{ matrix.arch }} configure build package
+
+      - name: Prebuild package
+        if: ${{ startsWith(matrix.os, 'ubuntu') }}
+        run: npx @mapbox/node-pre-gyp --target_arch=${{ matrix.arch }} configure build package
   build_musl_x86_64:
     runs-on: ubuntu-20.04
     container:
