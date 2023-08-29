@@ -55,7 +55,8 @@ jobs:
       - name: Install cross-compilation tools
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
         run: |
-          sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y \
+          sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main' \
+            && sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe' \
             && sudo apt-get -yq update \
             && sudo apt-get install gcc-4.8 g++-4.8 -yq \
             && sudo apt-get clean \
@@ -112,7 +113,9 @@ jobs:
 
       - name: Install cross-compilation tools
         run: |
-          sudo apt-get update -yq \
+          sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main' \
+            && sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe' \
+            && sudo apt-get -yq update \
             && sudo apt-get install gcc-4.8-aarch64-linux-gnu g++-4.8-aarch64-linux-gnu -yq \
             && sudo apt-get clean \
             && sudo rm -rf /var/lib/apt/lists/*
@@ -204,7 +207,9 @@ jobs:
 
       - name: Install cross-compilation tools
         run: |
-          sudo apt-get update -yq \
+          sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main' \
+            && sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe' \
+            && sudo apt-get -yq update \
             && sudo apt-get install gcc-4.8-arm-linux-gnueabihf g++-4.8-arm-linux-gnueabihf -yq \
             && sudo apt-get clean \
             && sudo rm -rf /var/lib/apt/lists/*
