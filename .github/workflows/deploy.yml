@@ -97,10 +97,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Prebuild package
-        run: |
-          CC=x86_64-linux-musl-gcc \
-          CXX=x86_64-linux-musl-g++ \
-          npx @mapbox/node-pre-gyp configure build package
+        run: npx @mapbox/node-pre-gyp configure build package
   build_aarch64:
     runs-on: ubuntu-20.04
     strategy:
