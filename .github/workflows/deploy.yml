@@ -3,6 +3,10 @@ name: Automated deploy
 on:
   release:
     types: [created]
+  # testing purpose
+  pull_request:
+    branches:
+      - '**'
 
 env:
   VERSION: ${{ github.event.release.tag_name }}
@@ -64,11 +68,6 @@ jobs:
           CC=gcc-4.8 \
           CXX=g++-4.8 \
           npx @mapbox/node-pre-gyp --target_arch=${{ matrix.arch }} configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
   build_musl_x86_64:
     runs-on: ubuntu-20.04
     container:
@@ -96,11 +95,6 @@ jobs:
           CC=x86_64-linux-musl-gcc \
           CXX=x86_64-linux-musl-g++ \
           npx @mapbox/node-pre-gyp configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
   build_aarch64:
     runs-on: ubuntu-20.04
     strategy:
@@ -132,11 +126,6 @@ jobs:
           CC=aarch64-linux-gnu-gcc-4.8 \
           CXX=aarch64-linux-gnu-g++-4.8 \
           npx @mapbox/node-pre-gyp --target_arch=arm64 configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
   build_darwin_aarch64:
     runs-on: macos-11
     strategy:
@@ -161,11 +150,6 @@ jobs:
         run: |
           CFLAGS="-target arm64-apple-macos11 -arch arm64" \
           npx @mapbox/node-pre-gyp --target_arch=arm64 configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
   build_musl_aarch64:
     runs-on: ubuntu-20.04
     container:
@@ -199,11 +183,6 @@ jobs:
           CC=$(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
           CXX=$(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++ \
           npx @mapbox/node-pre-gyp --target_arch=arm64 configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
   build_arm:
     runs-on: ubuntu-20.04
     strategy:
@@ -235,11 +214,6 @@ jobs:
           CC=arm-linux-gnueabihf-gcc-4.8 \
           CXX=arm-linux-gnueabihf-g++-4.8 \
           npx @mapbox/node-pre-gyp --target_arch=arm configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
   build_musl_arm:
     runs-on: ubuntu-20.04
     container:
@@ -273,47 +247,3 @@ jobs:
           CC=$(pwd)/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
           CXX=$(pwd)/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++ \
           npx @mapbox/node-pre-gyp --target_arch=arm configure build package
-
-      - name: Upload binaries to GitHub Release
-        run: npx node-pre-gyp-github publish
-        env:
-          NODE_PRE_GYP_GITHUB_TOKEN: ${{ secrets.GPR_TOKEN }}
-  deploy:
-    needs:
-      - build_x86_64
-      - build_musl_x86_64
-      - build_aarch64
-      - build_darwin_aarch64
-      - build_musl_aarch64
-      - build_arm
-      - build_musl_arm
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Publish to npm
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          registry-url: 'https://npm.pkg.github.com'
-          scope: '@NeuraLegion'
-
-      - name: Publish to GPR
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GPR_TOKEN }}
