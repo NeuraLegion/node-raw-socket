@@ -25,6 +25,16 @@
       ],
       "conditions": [
         [
+          "OS==\"mac\"",
+          {
+            "xcode_settings": {
+              "OTHER_CFLAGS": [
+                "-mmacosx-version-min=10.7"
+              ]
+            }
+          }
+        ],
+        [
           "OS==\"win\"",
           {
             "libraries": [
