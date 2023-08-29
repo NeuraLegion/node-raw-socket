@@ -15,6 +15,8 @@ env:
 jobs:
   build_x86_64:
     runs-on: ${{ matrix.os }}
+    env:
+      npm_config_python: python3.10
     strategy:
       fail-fast: false
       matrix:
@@ -34,13 +36,6 @@ jobs:
           - os: windows-2019
             node: 20
             arch: ia32
-        exclude:
-          - os: windows-2019
-            node: 14
-            arch: x64
-    env:
-      npm_config_msvs_version: 2019
-      npm_config_python: python3.10
     steps:
       - uses: actions/checkout@v3
         with:
@@ -51,6 +46,19 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           architecture: ${{ matrix.arch == 'ia32' && 'x86' || 'x64' }}
+
+      # https://github.com/nodejs/node-gyp/blob/main/docs/Updating-npm-bundled-node-gyp.md#windows
+      - name: Update node-gyp
+        shell: pwsh
+        if: ${{ startsWith(matrix.os, 'windows') && matrix.node <= 14 }}
+        run: |
+          # Find the location of node.exe
+          $nodeExeLocation = Get-Command node | Select-Object -ExpandProperty Source
+          # Extract the directory path from the node.exe location
+          $nodeDir = $nodeExeLocation | Split-Path
+          # Install node-gyp
+          npm i --prefix "$nodeDir\node_modules\npm\node_modules\npm-lifecycle" node-gyp@9.4.0
+          npm config set node_gyp "$nodeDir\node_modules\npm\node_modules\npm-lifecycle\node_modules\node-gyp\bin\node-gyp.js"
 
       - name: Install cross-compilation tools
         if: ${{ startsWith(matrix.os, 'ubuntu') }}
