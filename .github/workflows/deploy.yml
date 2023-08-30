@@ -3,39 +3,40 @@ name: Automated deploy
 on:
   release:
     types: [created]
-  # testing purpose
-  pull_request:
-    branches:
-      - '**'
 
 env:
   VERSION: ${{ github.event.release.tag_name }}
   TARGET_REF: ${{ github.event.release.target_commitish }}
 
 jobs:
-  build_x86_64:
+  build:
     runs-on: ${{ matrix.os }}
-    env:
-      npm_config_python: python3.10
     strategy:
       fail-fast: false
       matrix:
-        os: [ ubuntu-20.04, macos-11, windows-2019 ]
-        node: [ 14, 16, 18, 19, 20 ]
-        arch: [ x64 ]
         include:
+          - os: macos-11
+            node_arch: x64
+            command: build:gyp
+            args: --arch x64+arm64
           - os: windows-2019
-            node: 16
-            arch: ia32
+            node_arch: x86
+            command: build:gyp
           - os: windows-2019
-            node: 18
-            arch: ia32
-          - os: windows-2019
-            node: 19
-            arch: ia32
-          - os: windows-2019
-            node: 20
-            arch: ia32
+            node_arch: x64
+            command: build:gyp
+          - os: ubuntu-20.04
+            command: build:gyp-cross
+            args: -i centos7-devtoolset7 -i alpine
+          - os: ubuntu-20.04
+            command: build:gyp-cross
+            args: -i linux-arm64-lts -i linux-armv7 -i linux-armv6
+          - os: ubuntu-20.04
+            command: build:gyp-cross
+            args: --tag-libc musl -i linux-arm64-musl
+          - os: ubuntu-20.04
+            command: build:gyp-cross
+            args: -i android-arm64 -i android-armv7
     steps:
       - uses: actions/checkout@v3
         with:
@@ -44,113 +45,24 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node }}
-          architecture: ${{ matrix.arch == 'ia32' && 'x86' || 'x64' }}
-
-      # https://github.com/nodejs/node-gyp/blob/main/docs/Updating-npm-bundled-node-gyp.md#windows
-      - name: Update node-gyp
-        shell: pwsh
-        if: ${{ startsWith(matrix.os, 'windows') && matrix.node <= 14 }}
-        run: |
-          # Find the location of node.exe
-          $nodeExeLocation = Get-Command node | Select-Object -ExpandProperty Source
-          # Extract the directory path from the node.exe location
-          $nodeDir = $nodeExeLocation | Split-Path
-          # Install node-gyp
-          npm i --prefix "$nodeDir\node_modules\npm\node_modules\npm-lifecycle" node-gyp@9.4.0
-          npm config set node_gyp "$nodeDir\node_modules\npm\node_modules\npm-lifecycle\node_modules\node-gyp\bin\node-gyp.js"
-
-      - name: Install cross-compilation tools
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
-        run: |
-          sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main' \
-            && sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe' \
-            && sudo apt-get -yq update \
-            && sudo apt-get install gcc-4.8 g++-4.8 -yq \
-            && sudo apt-get clean \
-            && sudo rm -rf /var/lib/apt/lists/*
+          node-version: 18
+          architecture: ${{ matrix.node_arch }}
 
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: npm ci
 
       - name: Prebuild package
-        if: ${{ startsWith(matrix.os, 'ubuntu') }}
-        run: |
-          CC=x86_64-linux-gnu-gcc-4.8 \
-          CXX=x86_64-linux-gnu-g++-4.8 \
-          npx @mapbox/node-pre-gyp --target_arch=${{ matrix.arch }} configure build package
+        run: npm run ${{ matrix.command }} -- ${{ matrix.args }}
 
-      - name: Prebuild package
-        if: ${{ !startsWith(matrix.os, 'ubuntu') }}
-        run: npx @mapbox/node-pre-gyp --target_arch=${{ matrix.arch }} configure build package
-  build_musl_x86_64:
-    runs-on: ubuntu-20.04
-    container:
-      image: node:${{ matrix.node }}-alpine
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [ 14, 16, 18, 19, 20 ]
-    steps:
-      - uses: actions/checkout@v3
+      - uses: actions/upload-artifact@v3
         with:
-          ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
+          name: build-artifacts
+          path: prebuilds/
+          if-no-files-found: error
 
-      - name: Setup env with Node v${{ matrix.node }}
-        run: |
-          apk add --update
-          apk add --no-cache ca-certificates git curl build-base python3 g++ make
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Prebuild package
-        run: npx @mapbox/node-pre-gyp configure build package
-  build_aarch64:
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [ 14, 16, 18, 19, 20 ]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
-
-      - name: Install cross-compilation tools
-        run: |
-          sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main' \
-            && sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe' \
-            && sudo apt-get -yq update \
-            && sudo apt-get install gcc-4.8-aarch64-linux-gnu g++-4.8-aarch64-linux-gnu -yq \
-            && sudo apt-get clean \
-            && sudo rm -rf /var/lib/apt/lists/*
-      - name: Setup cross-compilation tools
-        run: |
-          curl -OL https://musl.cc/aarch64-linux-musl-cross.tgz
-          tar -xzvf aarch64-linux-musl-cross.tgz
-          $(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc --version
-
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node }}
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Prebuild package
-        run: |
-          CC=aarch64-linux-gnu-gcc-4.8 \
-          CXX=aarch64-linux-gnu-g++-4.8 \
-          npx @mapbox/node-pre-gyp --target_arch=arm64 configure build package
-  build_darwin_aarch64:
-    runs-on: macos-11
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [ 14, 16, 18, 19, 20 ]
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
@@ -159,111 +71,29 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 18
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          path: prebuilds
 
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: npm ci
 
-      - name: Prebuild package
-        run: |
-          CFLAGS="-target arm64-apple-macos11 -arch arm64" \
-          npx @mapbox/node-pre-gyp --target_arch=arm64 configure build package
-  build_musl_aarch64:
-    runs-on: ubuntu-20.04
-    container:
-      image: node:${{ matrix.node }}-alpine
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [ 14, 16, 18, 19, 20 ]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
-
-      - name: Setup env with Node v${{ matrix.node }}
-        run: |
-          apk add --update
-          apk add --no-cache ca-certificates git curl build-base python3 g++ make
-
-      - name: Setup musl cross compiler
-        run: |
-          curl -OL https://musl.cc/aarch64-linux-musl-cross.tgz
-          tar -xzvf aarch64-linux-musl-cross.tgz
-          $(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc --version
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Prebuild package
-        run: |
-          CC=$(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-gcc \
-          CXX=$(pwd)/aarch64-linux-musl-cross/bin/aarch64-linux-musl-g++ \
-          npx @mapbox/node-pre-gyp --target_arch=arm64 configure build package
-  build_arm:
-    runs-on: ubuntu-20.04
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [ 14, 16, 18, 19, 20 ]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
-
-      - name: Install cross-compilation tools
-        run: |
-          sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial main' \
-            && sudo apt-add-repository 'deb http://archive.ubuntu.com/ubuntu/ xenial universe' \
-            && sudo apt-get -yq update \
-            && sudo apt-get install gcc-4.8-arm-linux-gnueabihf g++-4.8-arm-linux-gnueabihf -yq \
-            && sudo apt-get clean \
-            && sudo rm -rf /var/lib/apt/lists/*
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - uses: actions/setup-node@v3
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 18
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@NeuraLegion'
 
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Prebuild package
-        run: |
-          CC=arm-linux-gnueabihf-gcc-4.8 \
-          CXX=arm-linux-gnueabihf-g++-4.8 \
-          npx @mapbox/node-pre-gyp --target_arch=arm configure build package
-  build_musl_arm:
-    runs-on: ubuntu-20.04
-    container:
-      image: node:${{ matrix.node }}-alpine
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [ 14, 16, 18, 19, 20 ]
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
-
-      - name: Setup env with Node v${{ matrix.node }}
-        run: |
-          apk add --update
-          apk add --no-cache ca-certificates git curl build-base python3 g++ make
-
-      - name: Setup musl cross compiler
-        run: |
-          curl -OL https://musl.cc/arm-linux-musleabihf-cross.tgz  
-          tar -xzvf arm-linux-musleabihf-cross.tgz  
-          $(pwd)/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc --version
-
-      - name: Install dependencies
-        run: npm ci --ignore-scripts
-
-      - name: Prebuild package
-        run: |
-          CC=$(pwd)/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-gcc \
-          CXX=$(pwd)/arm-linux-musleabihf-cross/bin/arm-linux-musleabihf-g++ \
-          npx @mapbox/node-pre-gyp --target_arch=arm configure build package
+      - name: Publish to GPR
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GPR_TOKEN }}

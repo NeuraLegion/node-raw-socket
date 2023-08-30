@@ -1,20 +1,8 @@
 {
+  "variables": {
+    "openssl_fips": ""
+  },
   "targets": [
-    {
-      "target_name": "action_after_build",
-      "type": "none",
-      "dependencies": [
-        "<(module_name)"
-      ],
-      "copies": [
-        {
-          "files": [
-            "<(PRODUCT_DIR)/<(module_name).node"
-          ],
-          "destination": "<(module_path)"
-        }
-      ]
-    },
     {
       "target_name": "raw_socket",
       "sources": [
@@ -28,8 +16,14 @@
           "OS==\"mac\"",
           {
             "xcode_settings": {
+              "MACOSX_DEPLOYMENT_TARGET": "10.7",
               "OTHER_CFLAGS": [
-                "-mmacosx-version-min=10.7"
+                "-arch x86_64",
+                "-arch arm64"
+              ],
+              "OTHER_LDFLAGS": [
+                "-arch x86_64",
+                "-arch arm64"
               ]
             }
           }
