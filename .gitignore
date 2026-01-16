@@ -3,4 +3,4 @@ build
 .idea
 node_modules
 npm-debug.log
-index.js
+index.cjs*
