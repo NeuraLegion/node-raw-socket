@@ -3,10 +3,31 @@
   "version": "1.8.6",
   "description": "Raw sockets for Node.js.",
   "main": "index.js",
+  "module": "index.mjs",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./index.d.ts",
+        "default": "./index.mjs"
+      },
+      "require": {
+        "types": "./index.d.ts",
+        "default": "./index.js"
+      }
+    }
+  },
+  "files": [
+    "index.js",
+    "index.mjs",
+    "index.d.ts",
+    "prebuilds",
+    "src",
+    "binding.gyp"
+  ],
   "directories": {
     "example": "example"
   },
-  "types": "index.d.ts",
   "gypfile": true,
   "private": false,
   "publishConfig": {
@@ -35,8 +56,10 @@
   ],
   "scripts": {
     "semantic-release": "semantic-release",
+    "build": "tsup",
     "build:gyp": "prebuildify --napi false --strip --target 20.20.0 --target 21.7.3 --target 22.22.0 --target 23.11.1 --target 24.13.0 --target 25.3.0",
     "build:gyp-cross": "prebuildify-cross --napi false --strip --target 20.20.0 --target 21.7.3 --target 22.22.0 --target 23.11.1 --target 24.13.0 --target 25.3.0",
+    "prepublishOnly": "npm run build",
     "install": "node-gyp-build"
   },
   "repository": {
@@ -68,7 +91,8 @@
     "@semantic-release/git": "^10.0.1",
     "prebuildify": "^6.0.1",
     "prebuildify-cross": "^5.1.1",
-    "semantic-release": "^25.0.2"
+    "semantic-release": "^25.0.2",
+    "tsup": "^8.0.0"
   },
   "overrides": {
     "prebuildify": {

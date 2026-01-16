@@ -1,0 +1,71 @@
+import {
+  Protocol,
+  SocketLevel,
+  SocketOption,
+  createSocket,
+  writeChecksum,
+  createChecksum
+} from '../index.mjs';
+
+if (process.argv.length < 4) {
+  console.log('node ping-set-option-ip-ttl <target> <ttl>');
+  process.exit(-1);
+}
+
+const target = process.argv[2];
+const ttl = parseInt(process.argv[3], 10);
+
+const options = {
+  protocol: Protocol.ICMP
+};
+
+const socket = createSocket(options);
+
+socket.on('close', () => {
+  console.log('socket closed');
+  process.exit(-1);
+});
+
+socket.on('error', (error) => {
+  console.log(`error: ${error}`);
+  process.exit(-1);
+});
+
+socket.on('message', (buffer, source) => {
+  console.log(`received ${buffer.length} bytes from ${source}`);
+  console.log(`data: ${buffer.toString('hex')}`);
+});
+
+// ICMP echo (ping) request
+const buffer = Buffer.from([
+  0x08, 0x00, 0x00, 0x00, 0x00, 0x01, 0x0a, 0x09,
+  0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68,
+  0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f, 0x70,
+  0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x61,
+  0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69
+]);
+
+writeChecksum(buffer, 2, createChecksum(buffer));
+
+const socketLevel = SocketLevel.IPPROTO_IP;
+const socketOption = SocketOption.IP_TTL;
+
+const beforeSend = () => {
+  socket.setOption(socketLevel, socketOption, ttl);
+};
+
+const afterSend = (error, bytes) => {
+  if (error) {
+    console.log(error.toString());
+  } else {
+    console.log(`sent ${bytes} bytes to ${target}`);
+  }
+};
+
+const ping = () => {
+  socket.send(buffer, 0, buffer.length, target, beforeSend, afterSend);
+
+  setTimeout(ping, 1000);
+};
+
+ping();
