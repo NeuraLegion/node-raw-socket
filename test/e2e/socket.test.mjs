@@ -2,11 +2,15 @@ import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert';
 import { createSocket, Protocol, AddressFamily, SocketLevel, SocketOption } from '../../index.mjs';
 
+const SKIP_ERRORS = [
+  'Operation not permitted',
+  'Protocol not supported',
+];
 const tryCreateSocket = (options) => {
   try {
     return createSocket(options);
   } catch (err) {
-    if (err.message === 'Operation not permitted') {
+    if (SKIP_ERRORS.includes(err.message)) {
       return null;
     }
     throw err;
