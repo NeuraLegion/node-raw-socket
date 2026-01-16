@@ -4,7 +4,7 @@ import assert from 'node:assert';
 describe('cjs import', () => {
   it('should be importable via require', async () => {
     // act
-    const module = await import('../../index.js');
+    const module = await import('../../index.cjs');
 
     // assert
     assert.ok(module);
@@ -20,7 +20,7 @@ describe('cjs import', () => {
   it('should have same exports as esm', async () => {
     // arrange
     const esm = await import('../../index.mjs');
-    const cjs = await import('../../index.js');
+    const cjs = await import('../../index.cjs');
     const keysToIgnore = ['default', 'module.exports'];
 
     // act
