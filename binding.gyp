@@ -1,6 +1,5 @@
 {
   "variables": {
-    "openssl_fips": "",
     "android_ndk_path": ""
   },
   "targets": [
@@ -12,20 +11,17 @@
       "include_dirs": [
         "<!(node -e \"require('nan')\")"
       ],
+      "cflags_cc": [
+        "-std=c++20"
+      ],
       "conditions": [
         [
           "OS==\"mac\"",
           {
             "xcode_settings": {
-              "MACOSX_DEPLOYMENT_TARGET": "10.7",
-              "OTHER_CFLAGS": [
-                "-arch x86_64",
-                "-arch arm64"
-              ],
-              "OTHER_LDFLAGS": [
-                "-arch x86_64",
-                "-arch arm64"
-              ]
+              "MACOSX_DEPLOYMENT_TARGET": "14.0",
+              "CLANG_CXX_LANGUAGE_STANDARD": "c++20",
+              "GCC_ENABLE_CPP_EXCEPTIONS": "YES"
             }
           }
         ],
@@ -34,7 +30,12 @@
           {
             "libraries": [
               "ws2_32.lib"
-            ]
+            ],
+            "msvs_settings": {
+              "VCCLCompilerTool": {
+                "AdditionalOptions": ["/std:c++20"]
+              }
+            }
           }
         ]
       ]

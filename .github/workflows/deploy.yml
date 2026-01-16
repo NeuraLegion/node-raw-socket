@@ -15,44 +15,43 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-12
+          - os: macos-15
             label: x64+arm64
             node_arch: x64
             command: build:gyp
             args: --arch x64+arm64
-          - os: windows-2019
-            label: x86
-            node_arch: x86
-            command: build:gyp
-          - os: windows-2019
+          - os: windows-2022
             label: x64
             node_arch: x64
             command: build:gyp
-          - os: ubuntu-20.04
+          - os: ubuntu-22.04
+            label: linux-glibc
+            command: build:gyp-cross
+            args: -i almalinux-devtoolset11
+          - os: ubuntu-22.04
             label: alpine
             command: build:gyp-cross
-            args: -i centos7-devtoolset7 -i alpine
-          - os: ubuntu-20.04
-            label: armv6+armv7
+            args: -i alpine
+          - os: ubuntu-22.04
+            label: linux-arm
             command: build:gyp-cross
-            args: -i linux-arm64-lts -i linux-armv7 -i linux-armv6
-          - os: ubuntu-20.04
-            label: musl+arm64-musl
+            args: -i linux-arm64 -i linux-armv7 -i linux-armv6
+          - os: ubuntu-22.04
+            label: linux-arm-musl
             command: build:gyp-cross
-            args: --tag-libc musl -i linux-arm64-musl
-          - os: ubuntu-20.04
-            label: arm64+armv7
+            args: -i linux-arm64-musl -i linux-armv7l-musl
+          - os: ubuntu-22.04
+            label: android-arm
             command: build:gyp-cross
             args: -i android-arm64 -i android-armv7
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           architecture: ${{ matrix.node_arch }}
 
       - name: Install dependencies
@@ -80,15 +79,18 @@ jobs:
   deploy:
     needs: merge
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.TARGET_REF }}
-          token: ${{ secrets.GPR_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: 'https://registry.npmjs.org'
 
       - uses: actions/download-artifact@v4
@@ -100,17 +102,15 @@ jobs:
         run: npm ci
 
       - name: Publish to npm
-        run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: 'https://npm.pkg.github.com'
           scope: '@NeuraLegion'
 
       - name: Publish to GPR
         run: npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.GPR_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
