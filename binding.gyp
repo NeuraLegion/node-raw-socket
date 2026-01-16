@@ -17,7 +17,7 @@
           "OS==\"mac\"",
           {
             "xcode_settings": {
-              "MACOSX_DEPLOYMENT_TARGET": "10.7",
+              "MACOSX_DEPLOYMENT_TARGET": "12.0",
               "OTHER_CFLAGS": [
                 "-arch x86_64",
                 "-arch arm64"
