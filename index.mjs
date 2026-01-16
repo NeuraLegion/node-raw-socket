@@ -1,14 +1,14 @@
-import { EventEmitter } from 'events';
-import net from 'net';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { EventEmitter } from 'node:events';
+import { isIP } from 'node:net';
+import { dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import nodeGypBuild from 'node-gyp-build';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 const raw = nodeGypBuild(__dirname);
 
-const _expandConstantObject = (object) => {
+const expandConstantObject = (object) => {
   const keys = Object.keys(object);
   for (const key of keys) {
     object[object[key]] = parseInt(key, 10);
@@ -20,7 +20,7 @@ const AddressFamily = {
   2: 'IPv6'
 };
 
-_expandConstantObject(AddressFamily);
+expandConstantObject(AddressFamily);
 
 const Protocol = {
   0: 'None',
@@ -30,7 +30,7 @@ const Protocol = {
   58: 'ICMPv6'
 };
 
-_expandConstantObject(Protocol);
+expandConstantObject(Protocol);
 
 for (const key of Object.keys(EventEmitter.prototype)) {
   raw.SocketWrap.prototype[key] = EventEmitter.prototype[key];
@@ -142,7 +142,7 @@ class Socket extends EventEmitter {
       return this;
     }
 
-    if (!net.isIP(address)) {
+    if (!isIP(address)) {
       afterCallback.call(this, new Error(`Invalid IP address '${address}'`));
       return this;
     }
