@@ -60,6 +60,13 @@ jobs:
         run: npm ci
 
       - name: Prebuild package
+        # Node 26's official Windows binary is ThinLTO-built, so node-gyp seeds
+        # every addon's config.gypi with enable_thin_lto/lto_jobs and common.gypi
+        # appends the lld-only /opt:lldltojobs to link.exe, which MSVC rejects
+        # (LNK1117). Force LTO off so the flag is not emitted. Inert on non-Windows.
+        env:
+          npm_config_enable_thin_lto: 'false'
+          npm_config_enable_lto: 'false'
         run: npm run ${{ matrix.command }} -- ${{ matrix.args }}
 
       - name: List produced prebuilds
