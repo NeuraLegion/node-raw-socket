@@ -1,0 +1,73 @@
+# TEMPORARY — TM-3894 prebuild gate. DELETE BEFORE MERGE.
+#
+# deploy.yml only runs `on: release: created`, so the prebuild matrix is
+# unreachable from a PR. This workflow mirrors deploy.yml's build matrix on a
+# branch push, running prebuildify / prebuildify-cross on host Node 26 and
+# uploading the results as artifacts. It NEVER publishes (no npm publish, no
+# release upload). Remove this file before the PR is merged.
+name: TMP TM-3894 prebuild gate
+
+on:
+  push:
+    branches:
+      - 'fix-#tm-3894/node-26-abi147-prebuilds'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            label: x64+arm64
+            node_arch: x64
+            command: build:gyp
+            args: --arch x64+arm64
+          - os: windows-2022
+            label: x64
+            node_arch: x64
+            command: build:gyp
+          - os: ubuntu-22.04
+            label: linux-glibc
+            command: build:gyp-cross
+            args: -i almalinux-devtoolset11
+          - os: ubuntu-22.04
+            label: alpine
+            command: build:gyp-cross
+            args: -i alpine
+          - os: ubuntu-22.04
+            label: linux-arm
+            command: build:gyp-cross
+            args: -i linux-arm64 -i linux-armv7 -i linux-armv6
+          - os: ubuntu-22.04
+            label: linux-arm-musl
+            command: build:gyp-cross
+            args: -i linux-arm64-musl -i linux-armv7l-musl
+          - os: ubuntu-22.04
+            label: android-arm
+            command: build:gyp-cross
+            args: -i android-arm64 -i android-armv7
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          architecture: ${{ matrix.node_arch }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prebuild package
+        run: npm run ${{ matrix.command }} -- ${{ matrix.args }}
+
+      - name: List produced prebuilds
+        shell: bash
+        run: ls -R prebuilds
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tmp-tm3894-prebuilds-${{ matrix.os }}-${{ matrix.label }}
+          path: prebuilds/
+          if-no-files-found: error
