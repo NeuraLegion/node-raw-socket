@@ -78,6 +78,17 @@ jobs:
         shell: bash
         run: ls -R prebuilds
 
+      - name: Verify the produced prebuild loads for the host ABI (no source fallback)
+        # Only the native build:gyp legs can execute their own output; the
+        # build:gyp-cross artifacts target other arches/libc and cannot run here.
+        if: matrix.command == 'build:gyp'
+        shell: bash
+        env:
+          PREBUILDS_ONLY: '1'
+        run: |
+          npm run build
+          node --test test/e2e/prebuild-abi.test.mjs
+
       - uses: actions/upload-artifact@v4
         with:
           name: tmp-tm3894-prebuilds-${{ matrix.os }}-${{ matrix.label }}
