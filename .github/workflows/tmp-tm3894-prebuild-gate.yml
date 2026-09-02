@@ -57,6 +57,11 @@ jobs:
           architecture: ${{ matrix.node_arch }}
 
       - name: Install dependencies
+        # The `install` script runs node-gyp-build, which source-builds on
+        # Windows and hits the Node 26 /opt:lldltojobs LNK1117 (see below).
+        env:
+          npm_config_enable_thin_lto: 'false'
+          npm_config_enable_lto: 'false'
         run: npm ci
 
       - name: Prebuild package
