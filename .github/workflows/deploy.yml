@@ -19,7 +19,7 @@ jobs:
             label: x64+arm64
             node_arch: x64
             command: build:gyp
-            args: --arch x64+arm64
+            universal: 'true'
           - os: windows-2022
             label: x64
             node_arch: x64
@@ -27,23 +27,23 @@ jobs:
           - os: ubuntu-22.04
             label: linux-glibc
             command: build:gyp-cross
-            args: -i almalinux-devtoolset11
+            args: --tag-libc -i almalinux-devtoolset11
           - os: ubuntu-22.04
             label: alpine
             command: build:gyp-cross
-            args: -i alpine
+            args: --tag-libc -i alpine
           - os: ubuntu-22.04
             label: linux-arm
             command: build:gyp-cross
-            args: -i linux-arm64 -i linux-armv7 -i linux-armv6
+            args: --tag-libc -i linux-arm64 -i linux-armv7 -i linux-armv6
           - os: ubuntu-22.04
             label: linux-arm-musl
             command: build:gyp-cross
-            args: -i linux-arm64-musl -i linux-armv7l-musl
+            args: --tag-libc -i linux-arm64-musl -i linux-armv7l-musl
           - os: ubuntu-22.04
             label: android-arm
             command: build:gyp-cross
-            args: -i android-arm64 -i android-armv7
+            args: --tag-libc -i android-arm64 -i android-armv7
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,10 +65,45 @@ jobs:
         # appends the lld-only /opt:lldltojobs to link.exe and breaks the MSVC
         # Windows build (LNK1117). Force LTO off so the flag is not emitted.
         # Inert on non-Windows / non-Node-26 targets.
+        if: matrix.universal != 'true'
         env:
           npm_config_enable_thin_lto: 'false'
           npm_config_enable_lto: 'false'
         run: npm run ${{ matrix.command }} -- ${{ matrix.args }}
+
+      - name: Prebuild universal macOS binary (x64 + arm64, lipo-fused)
+        # prebuildify passes only the first arch of an "x64+arm64" tuple to
+        # node-gyp, so a single run produces an x86_64-only binary that an
+        # arm64 Node cannot load. Build each slice separately, then lipo them
+        # into one fat binary per ABI under the darwin-x64+arm64 directory the
+        # resolver looks up, and drop the single-arch dirs so only the fat
+        # binary ships. Fail if any output is not actually dual-arch.
+        if: matrix.universal == 'true'
+        shell: bash
+        env:
+          npm_config_enable_thin_lto: 'false'
+          npm_config_enable_lto: 'false'
+        run: |
+          set -euo pipefail
+          npm run ${{ matrix.command }} -- --arch x64
+          npm run ${{ matrix.command }} -- --arch arm64
+          fat="prebuilds/darwin-x64+arm64"
+          mkdir -p "$fat"
+          for x in prebuilds/darwin-x64/*.node; do
+            name="$(basename "$x")"
+            a="prebuilds/darwin-arm64/$name"
+            if [ ! -f "$a" ]; then
+              echo "::error::missing arm64 slice for $name"; exit 1
+            fi
+            lipo -create "$x" "$a" -output "$fat/$name"
+            archs="$(lipo -archs "$fat/$name")"
+            case "$archs" in
+              *x86_64*arm64*|*arm64*x86_64*) echo "OK $name -> $archs" ;;
+              *) echo "::error::$name is not universal: $archs"; exit 1 ;;
+            esac
+          done
+          rm -rf prebuilds/darwin-x64 prebuilds/darwin-arm64
+          ls -R prebuilds
 
       - uses: actions/upload-artifact@v4
         with:
