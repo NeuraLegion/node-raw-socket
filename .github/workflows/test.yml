@@ -14,8 +14,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node-version: [20, 22, 23, 24]
+        # windows-latest now serves Windows Server 2025 (VS 18), which the older
+        # node-gyp bundled with Node 20/22/23 cannot detect ("Could not find any
+        # Visual Studio installation"). Pin to windows-2022 for legacy coverage;
+        # it is also the image deploy.yml builds the Windows release on.
+        os: [ubuntu-latest, macos-latest, windows-2022]
+        node-version: [20, 22, 23, 24, 25, 26]
     steps:
       - uses: actions/checkout@v4
 
@@ -29,6 +33,13 @@ jobs:
         run: sudo setcap cap_net_raw,cap_net_admin,cap_net_bind_service+eip $(which node)
 
       - name: Install dependencies
+        # Node 26's official Windows binary is ThinLTO-built, so node-gyp seeds
+        # config.gypi with enable_thin_lto/lto_jobs and common.gypi appends the
+        # lld-only /opt:lldltojobs to link.exe, which MSVC rejects (LNK1117) when
+        # node-gyp-build source-builds. Force LTO off. Inert on non-Windows.
+        env:
+          npm_config_enable_thin_lto: 'false'
+          npm_config_enable_lto: 'false'
         run: npm ci
 
       - name: Build

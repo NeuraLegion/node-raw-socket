@@ -55,9 +55,19 @@ jobs:
           architecture: ${{ matrix.node_arch }}
 
       - name: Install dependencies
+        env:
+          npm_config_enable_thin_lto: 'false'
+          npm_config_enable_lto: 'false'
         run: npm ci
 
       - name: Prebuild package
+        # Node 26 (--target 26.x) pulls Node 26's ThinLTO common.gypi, which
+        # appends the lld-only /opt:lldltojobs to link.exe and breaks the MSVC
+        # Windows build (LNK1117). Force LTO off so the flag is not emitted.
+        # Inert on non-Windows / non-Node-26 targets.
+        env:
+          npm_config_enable_thin_lto: 'false'
+          npm_config_enable_lto: 'false'
         run: npm run ${{ matrix.command }} -- ${{ matrix.args }}
 
       - uses: actions/upload-artifact@v4
